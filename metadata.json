@@ -1,0 +1,6 @@
+{
+  "name": "TGHM Research Studio",
+  "description": "Tri-Strata Governed Hybrid Model (TGHM) architecture simulator and updated 2026 research paper workbench extending Ahmed et al. (WJET, 2025).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
