@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onExportLatex}
             className="rounded-md bg-[#1E3A8A] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#172554] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E3A8A]"
           >
-            Export LaTeX
+            Download Word (.docx)
           </button>
         </div>
       </div>

@@ -8,9 +8,9 @@ import { ManuscriptStudio } from './components/ManuscriptStudio';
 import { evaluateTghmModel, SCENARIO_PRESETS, TghmSimulationInput } from './model/tghmEngine';
 import {
   DEFAULT_MANUSCRIPT_CONFIG,
-  generateLatexSource,
   ManuscriptConfig,
 } from './data/manuscriptGenerator';
+import { generateWordDocBlob } from './data/wordDocGenerator';
 import { BASELINE_PAPER_META } from './data/paperBaseline';
 
 export default function App() {
@@ -27,13 +27,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleQuickExportLatex = () => {
-    const tex = generateLatexSource(manuscriptConfig, simInput, simOutput);
-    const blob = new Blob([tex], { type: 'text/plain;charset=utf-8' });
+  const handleQuickExportWord = async () => {
+    const blob = await generateWordDocBlob(manuscriptConfig, simInput, simOutput);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'tghm_updated_paper.tex';
+    a.download = 'TGHM_Updated_Research_Paper_2026.docx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -46,7 +45,7 @@ export default function App() {
       <Header
         activeSection={activeSection}
         onNavigate={handleNavigate}
-        onExportLatex={handleQuickExportLatex}
+        onExportLatex={handleQuickExportWord}
       />
 
       <main className="flex-1">

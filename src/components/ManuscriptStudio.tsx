@@ -5,7 +5,9 @@ import {
   AUTHORS,
   BASELINE_PAPER_META,
   DATASET_EXPANSION_SUITE,
+  FIGURE_1_ADOPTION_DATA,
   GAP_TRACEABILITY_MATRIX,
+  RE_EVALUATION_PROTOCOL,
   REFERENCES_LIST,
 } from '../data/paperBaseline';
 import {
@@ -16,7 +18,16 @@ import {
   generateMarkdownSource,
   ManuscriptConfig,
 } from '../data/manuscriptGenerator';
-import { TghmSimulationInput, TghmSimulationOutput } from '../model/tghmEngine';
+import { generateWordDocBlob } from '../data/wordDocGenerator';
+import {
+  computeSensitivityAnalysis,
+  evaluateAllFourBaselines,
+  getPlaneEvaluationSummaries,
+  getThreeWayParadigmComparison,
+  TghmSimulationInput,
+  TghmSimulationOutput,
+  WORKLOAD_COMPLEXITY_MAP,
+} from '../model/tghmEngine';
 
 interface ManuscriptStudioProps {
   config: ManuscriptConfig;
@@ -33,11 +44,16 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
 }) => {
   const [copiedFormat, setCopiedFormat] = useState<'latex' | 'bibtex' | 'markdown' | null>(null);
   const [previewMode, setPreviewMode] = useState<'formatted' | 'latex'>('formatted');
+  const [isExportingWord, setIsExportingWord] = useState<boolean>(false);
 
   const sections = buildUpdatedPaperSections(config, simInput, simOutput);
   const latexSource = generateLatexSource(config, simInput, simOutput);
   const bibtexSource = generateBibtexSource(config);
   const markdownSource = generateMarkdownSource(config, simInput, simOutput);
+  const fourBaselines = evaluateAllFourBaselines(15);
+  const sensitivity = computeSensitivityAnalysis(simInput, 15, 'throughput');
+  const planeSummaries = getPlaneEvaluationSummaries(simOutput);
+  const paradigmRows = getThreeWayParadigmComparison(simOutput);
 
   const handleCopy = async (kind: 'latex' | 'bibtex' | 'markdown', content: string) => {
     try {
@@ -63,6 +79,23 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadWord = async () => {
+    try {
+      setIsExportingWord(true);
+      const blob = await generateWordDocBlob(config, simInput, simOutput);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'TGHM_Updated_Research_Paper_2026.docx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingWord(false);
+    }
   };
 
   return (
@@ -98,6 +131,16 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
               LaTeX Source
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleDownloadWord}
+            disabled={isExportingWord}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#1E3A8A] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#172554] disabled:opacity-60 whitespace-nowrap shrink-0"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{isExportingWord ? 'Generating .docx...' : 'Download Word (.docx)'}</span>
+          </button>
 
           <button
             type="button"
@@ -187,20 +230,27 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
                 <p className="mt-2 text-sm leading-relaxed text-[#292524] first-letter:float-left first-letter:mr-2.5 first-letter:mt-1 first-letter:font-serif first-letter:text-4xl first-letter:font-bold first-letter:text-[#1C1917]">
                   Low-Code/No-Code (LCNC) platforms combined with Artificial Intelligence and Machine Learning
                   (AI/ML) have accelerated enterprise delivery, yet our baseline systematic study (Ahmed et al.,
-                  2025) documented critical unresolved risks: over 40% of citizen-built enterprise applications
+                  2025 [1]) documented critical unresolved risks: over 40% of citizen-built enterprise applications
                   exposed sensitive data via weak access controls, monolithic runtimes degraded under IoT and
                   deep computer-vision workloads (YOLOv2, 3D-DCM, PVAM), proprietary DSLs imposed vendor
                   lock-in, and generative AI introduced unverified logic. This updated paper proposes the{' '}
                   <strong>Tri-Strata Governed Hybrid Model (TGHM)</strong> and the{' '}
                   <strong>AMPO-ZT</strong> topological partitioning algorithm, evaluated across four
-                  complementary multi-domain datasets. Under live simulation, TGHM achieves{' '}
+                  complementary multi-domain datasets and one-at-a-time throughput sensitivity sweeps. Under live
+                  simulation, TGHM achieves{' '}
                   <span className="font-mono font-semibold">{simOutput.portabilityIndexPct}%</span> Open-IR
                   portability, a governance readiness index of{' '}
-                  <span className="font-mono font-semibold">{simOutput.governanceScore.toFixed(2)}</span>, and{' '}
+                  <span className="font-mono font-semibold">{simOutput.governanceScore.toFixed(2)}</span>,{' '}
+                  <span className="font-mono font-semibold">{simOutput.effectiveThroughputRps} req/s</span>{' '}
+                  effective throughput (vs.{' '}
+                  <span className="font-mono font-semibold">{simOutput.legacyThroughputRps} req/s</span> legacy
+                  LCNC), and{' '}
                   <span className="font-mono font-semibold">{simOutput.debtReductionPct}%</span> lower 36-month
                   technical debt while preserving{' '}
                   <span className="font-mono font-semibold">{simOutput.sdlcAccelerationPct}%</span> SDLC
-                  acceleration.
+                  acceleration, charting a roadmap spanning graph-isomorphism IR matching, kinematic HITL
+                  biometrics, federated CAN intrusion detection, honeypot cyber-deception, RTOS/kernel
+                  isolation, and peer-to-peer energy trading.
                 </p>
                 <p className="mt-3 text-xs text-[#57534E]">
                   <strong className="text-[#9A3412]">Keywords:</strong> Low-Code/No-Code, Hybrid AI/ML
@@ -250,6 +300,36 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
                   </ol>
                 </section>
 
+                {/* Figure 1: Adoption Chart (SVG) */}
+                <section className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-5">
+                  <div className="space-y-2">
+                    {FIGURE_1_ADOPTION_DATA.map((row) => (
+                      <div key={row.area} className="grid grid-cols-12 items-center gap-2 text-[11px]">
+                        <span className="col-span-5 font-medium text-[#1C1917] truncate">
+                          {row.area}
+                        </span>
+                        <div className="col-span-6 space-y-0.5">
+                          <div className="h-1.5 bg-[#E7E3DA]">
+                            <div className="h-full bg-[#94A3B8]" style={{ width: `${row.q1_2022}%` }} />
+                          </div>
+                          <div className="h-1.5 bg-[#E7E3DA]">
+                            <div className="h-full bg-[#475569]" style={{ width: `${row.q3_2023}%` }} />
+                          </div>
+                          <div className="h-1.5 bg-[#EFF6FF]">
+                            <div className="h-full bg-[#1E3A8A]" style={{ width: `${row.projected_2026_tghm}%` }} />
+                          </div>
+                        </div>
+                        <span className="col-span-1 text-right font-mono font-semibold text-[#1E3A8A] tabular-nums">
+                          {row.projected_2026_tghm}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 font-serif text-xs italic text-[#57534E]">
+                    Figure 1 — LCNC adoption across 13 software areas: Q1 2022 (light gray), Q3 2023 (charcoal, Ahmed et al. 2025), and 2026 TGHM Hybrid-Agentic projection (blue).
+                  </p>
+                </section>
+
                 {/* Table 1: Traceability */}
                 {config.includeSimulationTable && (
                   <section>
@@ -267,10 +347,13 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
                         </thead>
                         <tbody className="divide-y divide-[#ECE8DF]">
                           {GAP_TRACEABILITY_MATRIX.map((g) => (
-                            <tr key={g.id}>
-                              <td className="py-2 pr-3 font-medium text-[#1C1917]">{g.baselineProblem}</td>
+                            <tr key={g.id} className="align-top">
+                              <td className="py-2 pr-3">
+                                <div className="font-medium text-[#1C1917]">{g.baselineProblem}</div>
+                                <div className="text-[11px] text-[#57534E]">{g.sourceSection} · {g.citationRef}</div>
+                              </td>
                               <td className="py-2 pr-3 text-[#44403C]">
-                                {g.tghmPlane}: {g.tghmModule}
+                                <span className="font-mono font-semibold text-[#1E3A8A]">{g.tghmPlane}</span>: {g.tghmModule}
                               </td>
                               <td className="py-2 font-mono text-[#14532D]">{g.validationMetric}</td>
                             </tr>
@@ -281,34 +364,588 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
                   </section>
                 )}
 
-                {/* Table 2: Datasets */}
+                {/* Table 2: Detailed Datasets & 5-Step Protocol */}
                 {config.includeDatasetExpansion && (
-                  <section>
+                  <section className="space-y-4">
+                    <div>
+                      <p className="font-serif text-xs italic text-[#57534E]">
+                        Table 2 — Detailed Multi-Domain Benchmark Dataset Specifications for TGHM Re-Evaluation.
+                      </p>
+                      <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                              <th className="py-2 pr-3 font-semibold">Dataset Suite &amp; Scale</th>
+                              <th className="py-2 pr-3 font-semibold">Complements 2025 Baseline</th>
+                              <th className="py-2 font-semibold">Generalizability &amp; Metrics</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#ECE8DF]">
+                            {DATASET_EXPANSION_SUITE.map((d) => (
+                              <tr key={d.id} className="align-top">
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-semibold text-[#1C1917]">{d.name}</div>
+                                  <div className="font-mono text-[11px] text-[#1E3A8A]">{d.targetTghmPlane} · {d.domain}</div>
+                                  <div className="mt-0.5 text-[11px] text-[#57534E]">{d.scaleAndFormat}</div>
+                                </td>
+                                <td className="py-2.5 pr-3 text-[#44403C]">{d.complementsBaseline}</td>
+                                <td className="py-2.5 text-[#44403C]">
+                                  <div>{d.enhancementRole}</div>
+                                  <div className="mt-1 font-mono text-[11px] text-[#14532D]">
+                                    Metrics: {d.reEvaluationMetrics.join(', ')}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-4">
+                      <h3 className="font-serif text-sm font-semibold text-[#1C1917]">
+                        Five-Stage Dataset Integration &amp; Re-Evaluation Protocol
+                      </h3>
+                      <ol className="mt-2 space-y-1.5 text-xs text-[#44403C]">
+                        {RE_EVALUATION_PROTOCOL.map((p) => (
+                          <li key={p.step}>
+                            <strong className="text-[#1C1917]">Step {p.step} ({p.title}):</strong> {p.methodology}{' '}
+                            <span className="font-mono text-[11px] text-[#78716C]">[{p.outputArtifact}]</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </section>
+                )}
+
+                {/* Table 3A: All Four Baseline Case-Study Specifications */}
+                <section className="space-y-6">
+                  <div>
                     <p className="font-serif text-xs italic text-[#57534E]">
-                      Table 2 — Complementary Multi-Domain Benchmark Datasets for TGHM Re-Evaluation.
+                      Table 3A — Baseline Case-Study Parameter Specifications from Ahmed et al. (2025) [1].
                     </p>
                     <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className="border-b border-[#DED9CE] text-[#57534E]">
-                            <th className="py-2 pr-3 font-semibold">Dataset Suite</th>
-                            <th className="py-2 pr-3 font-semibold">Plane</th>
-                            <th className="py-2 font-semibold">Re-Evaluation Metrics</th>
+                            <th className="py-2 pr-2 font-semibold">Baseline &amp; Source</th>
+                            <th className="py-2 pr-2 font-semibold">Workload C(w)</th>
+                            <th className="py-2 pr-2 font-semibold text-right">λ / L_max</th>
+                            <th className="py-2 pr-2 font-semibold text-right">L_infra / δ / τ</th>
+                            <th className="py-2 font-semibold text-right">PII &amp; Gate Mode</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#ECE8DF]">
-                          {DATASET_EXPANSION_SUITE.map((d) => (
-                            <tr key={d.id}>
-                              <td className="py-2 pr-3 font-medium text-[#1C1917]">{d.name}</td>
-                              <td className="py-2 pr-3 font-mono text-[#1E3A8A]">{d.targetTghmPlane}</td>
-                              <td className="py-2 text-[#44403C]">{d.reEvaluationMetrics.join(', ')}</td>
+                          {fourBaselines.map((b) => (
+                            <tr key={b.code} className="align-top">
+                              <td className="py-2 pr-2">
+                                <div className="font-medium text-[#1C1917]">
+                                  {b.code}: {b.preset.label}
+                                </div>
+                                <div className="font-mono text-[11px] text-[#78716C]">
+                                  {b.preset.sourceCitation}
+                                </div>
+                              </td>
+                              <td className="py-2 pr-2 text-[#44403C]">
+                                <div>{WORKLOAD_COMPLEXITY_MAP[b.preset.input.workloadType].label}</div>
+                                <div className="font-mono text-[11px] text-[#1E3A8A]">
+                                  C={WORKLOAD_COMPLEXITY_MAP[b.preset.input.workloadType].normalizedC.toFixed(2)}
+                                </div>
+                              </td>
+                              <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#1C1917]">
+                                {b.preset.input.throughputRps} req/s
+                                <div className="text-[11px] text-[#78716C]">SLA {b.preset.input.latencySlaMs} ms</div>
+                              </td>
+                              <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#44403C]">
+                                {b.preset.input.infraLatencyMs ?? 14} ms / {b.preset.input.customizabilityNeed.toFixed(2)} / {b.preset.input.hitlConfidenceTau.toFixed(2)}
+                              </td>
+                              <td className="py-2 text-right font-mono text-[11px] text-[#1C1917]">
+                                {b.preset.input.piiTier.toUpperCase()}
+                                <div className={b.preset.input.staticPolicyGateEnabled ? 'text-[#14532D]' : 'text-[#9A3412]'}>
+                                  {b.preset.input.staticPolicyGateEnabled ? 'Open-IR + Gate ON' : 'Legacy DSL, Gate OFF'}
+                                </div>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </section>
-                )}
+                  </div>
+
+                  {/* Table 3B: Comparative Workload Simulation Results Across All Four Baselines */}
+                  <div>
+                    <p className="font-serif text-xs italic text-[#57534E]">
+                      Table 3B — Comparative Workload Simulation Results Across All Four Baselines (Including TGHM Remediation for B4).
+                    </p>
+                    <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                            <th className="py-2 pr-2 font-semibold">Baseline Scenario</th>
+                            <th className="py-2 pr-2 font-semibold">Ω(w) &amp; Route</th>
+                            <th className="py-2 pr-2 font-semibold text-right">Latency</th>
+                            <th className="py-2 pr-2 font-semibold text-right">TGHM vs Legacy</th>
+                            <th className="py-2 pr-2 font-semibold text-right">G_score / Π_IR</th>
+                            <th className="py-2 font-semibold text-right">Debt Drop</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#ECE8DF]">
+                          {fourBaselines.map((b) => (
+                            <React.Fragment key={b.code}>
+                              <tr className="align-top">
+                                <td className="py-2 pr-2">
+                                  <div className="font-medium text-[#1C1917]">
+                                    {b.code}: {b.preset.label}
+                                  </div>
+                                  <div className="font-mono text-[11px] text-[#78716C]">
+                                    λ={b.preset.input.throughputRps} req/s · SLA {b.preset.input.latencySlaMs} ms
+                                  </div>
+                                </td>
+                                <td className="py-2 pr-2">
+                                  <div className="font-mono font-semibold text-[#1E3A8A] tabular-nums">
+                                    {b.output.omegaScore.toFixed(3)}
+                                  </div>
+                                  <div className="text-[11px] text-[#57534E]">{b.output.routingDecision}</div>
+                                </td>
+                                <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#1C1917]">
+                                  {b.output.estimatedLatencyMs} ms
+                                  <div className={`text-[10px] ${b.output.slaSatisfied ? 'text-[#14532D]' : 'text-[#9A3412]'}`}>
+                                    {b.output.slaSatisfied ? 'SLA Met' : 'Breach'}
+                                  </div>
+                                </td>
+                                <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#14532D]">
+                                  {b.output.effectiveThroughputRps} vs {b.output.legacyThroughputRps} req/s
+                                </td>
+                                <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#1C1917]">
+                                  {b.output.governanceScore.toFixed(2)} / {b.output.portabilityIndexPct}%
+                                  <div className={`text-[10px] ${b.output.governanceState === 'Verified' ? 'text-[#14532D]' : 'text-[#9A3412]'}`}>
+                                    {b.output.governanceState}
+                                  </div>
+                                </td>
+                                <td className="py-2 text-right font-mono font-semibold tabular-nums text-[#14532D]">
+                                  -{b.output.debtReductionPct}%
+                                </td>
+                              </tr>
+                              {b.tghmGovernedOutput && (
+                                <tr className="align-top bg-[#FAF9F6]">
+                                  <td className="py-2 pr-2">
+                                    <div className="font-medium text-[#1E3A8A]">
+                                      {b.code}-TGHM: Governed Citizen GenAI
+                                    </div>
+                                    <div className="font-mono text-[11px] text-[#57534E]">
+                                      τ=0.88 · Open-IR · Static RBAC Gate ON
+                                    </div>
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <div className="font-mono font-semibold text-[#1E3A8A] tabular-nums">
+                                      {b.tghmGovernedOutput.omegaScore.toFixed(3)}
+                                    </div>
+                                    <div className="text-[11px] text-[#57534E]">
+                                      {b.tghmGovernedOutput.routingDecision}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#1C1917]">
+                                    {b.tghmGovernedOutput.estimatedLatencyMs} ms
+                                    <div className="text-[10px] text-[#14532D]">SLA Met</div>
+                                  </td>
+                                  <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#14532D]">
+                                    {b.tghmGovernedOutput.effectiveThroughputRps} vs {b.tghmGovernedOutput.legacyThroughputRps} req/s
+                                  </td>
+                                  <td className="py-2 pr-2 text-right font-mono tabular-nums text-[#1C1917]">
+                                    {b.tghmGovernedOutput.governanceScore.toFixed(2)} / {b.tghmGovernedOutput.portabilityIndexPct}%
+                                    <div className="text-[10px] text-[#14532D]">
+                                      {b.tghmGovernedOutput.governanceState}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 text-right font-mono font-semibold tabular-nums text-[#14532D]">
+                                    -{b.tghmGovernedOutput.debtReductionPct}%
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Figure 4: Multi-Baseline Throughput Bar Comparison (SVG) */}
+                  {(() => {
+                    const maxRps = Math.max(
+                      400,
+                      ...fourBaselines.map((b) =>
+                        Math.max(
+                          b.output.legacyThroughputRps,
+                          b.output.effectiveThroughputRps,
+                          b.tghmGovernedOutput?.effectiveThroughputRps ?? 0
+                        )
+                      )
+                    );
+                    const niceMax = Math.ceil(maxRps / 250) * 250;
+                    const w = 540;
+                    const h = 210;
+                    const pL = 46;
+                    const pR = 16;
+                    const pT = 22;
+                    const pB = 46;
+                    const plW = w - pL - pR;
+                    const plH = h - pT - pB;
+                    const groupW = plW / fourBaselines.length;
+                    const barW = 28;
+
+                    return (
+                      <div className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-4">
+                        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" role="img" aria-label="Figure 4 Multi-Baseline Throughput Comparison">
+                          {[0, 0.5, 1].map((f) => {
+                            const y = pT + plH * (1 - f);
+                            return (
+                              <g key={f}>
+                                <line x1={pL} y1={y} x2={w - pR} y2={y} stroke="#DED9CE" strokeDasharray="3 3" />
+                                <text x={pL - 6} y={y + 4} textAnchor="end" className="fill-[#78716C] font-mono text-[10px]">
+                                  {Math.round(niceMax * f)}
+                                </text>
+                              </g>
+                            );
+                          })}
+                          {fourBaselines.map((b, idx) => {
+                            const cx = pL + idx * groupW + groupW / 2;
+                            const legacyVal = b.output.legacyThroughputRps;
+                            const tghmOut = b.tghmGovernedOutput ?? b.output;
+                            const tghmVal = tghmOut.effectiveThroughputRps;
+                            const legH = (legacyVal / niceMax) * plH;
+                            const tgH = (tghmVal / niceMax) * plH;
+                            const shortTitle =
+                              b.code === 'B1'
+                                ? 'B1: Siemens'
+                                : b.code === 'B2'
+                                  ? 'B2: PowerApps'
+                                  : b.code === 'B3'
+                                    ? 'B3: 3D-DCM'
+                                    : 'B4: GenAI*';
+                            return (
+                              <g key={b.code}>
+                                <rect x={cx - barW - 3} y={pT + plH - legH} width={barW} height={legH} fill="#9A3412" />
+                                <text x={cx - barW / 2 - 3} y={pT + plH - legH - 4} textAnchor="middle" className="fill-[#9A3412] font-mono text-[9px] font-semibold">
+                                  {legacyVal}
+                                </text>
+                                <rect x={cx + 3} y={pT + plH - tgH} width={barW} height={tgH} fill="#1E3A8A" />
+                                <text x={cx + barW / 2 + 3} y={pT + plH - tgH - 4} textAnchor="middle" className="fill-[#1E3A8A] font-mono text-[9px] font-semibold">
+                                  {tghmVal}
+                                </text>
+                                <text x={cx} y={h - pB + 16} textAnchor="middle" className="fill-[#1C1917] text-[10px] font-semibold">
+                                  {shortTitle}
+                                </text>
+                                <text x={cx} y={h - pB + 29} textAnchor="middle" className="fill-[#57534E] font-mono text-[9px]">
+                                  Ω={tghmOut.omegaScore.toFixed(2)} · G={tghmOut.governanceScore.toFixed(2)}
+                                </text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                        <p className="mt-2 font-serif text-xs italic text-[#57534E]">
+                          Figure 4 — Multi-baseline SLA-compliant throughput comparison across all four Ahmed et al. (2025) [1] benchmarks (B1–B4, *B4 evaluated under TGHM Plane I–III governance): Monolithic Legacy LCNC (terracotta) vs. TGHM AMPO-ZT (blue).
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </section>
+
+                {/* Figure 2: 36-Month Technical Debt Trajectory (SVG) */}
+                {(() => {
+                  const maxDebt = Math.max(
+                    100,
+                    ...simOutput.debtTrajectory.map((d) => Math.max(d.legacyLcncDebt, d.tghmDebt))
+                  );
+                  const w = 540;
+                  const h = 190;
+                  const pL = 42;
+                  const pR = 16;
+                  const pT = 16;
+                  const pB = 28;
+                  const plW = w - pL - pR;
+                  const plH = h - pT - pB;
+                  const tx = (m: number) => pL + (m / 36) * plW;
+                  const ty = (v: number) => pT + plH - (v / maxDebt) * plH;
+                  const legPath = simOutput.debtTrajectory
+                    .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${tx(pt.month).toFixed(1)} ${ty(pt.legacyLcncDebt).toFixed(1)}`)
+                    .join(' ');
+                  const tghmPath = simOutput.debtTrajectory
+                    .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${tx(pt.month).toFixed(1)} ${ty(pt.tghmDebt).toFixed(1)}`)
+                    .join(' ');
+                  return (
+                    <section className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-4">
+                      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" role="img" aria-label="Figure 2 Technical Debt Trajectory">
+                        {[0, 0.5, 1].map((f) => {
+                          const y = pT + plH * (1 - f);
+                          return (
+                            <g key={f}>
+                              <line x1={pL} y1={y} x2={w - pR} y2={y} stroke="#DED9CE" strokeDasharray="3 3" />
+                              <text x={pL - 6} y={y + 4} textAnchor="end" className="fill-[#78716C] font-mono text-[10px]">
+                                {Math.round(maxDebt * f)}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        {simOutput.debtTrajectory.map((pt) => (
+                          <text key={pt.month} x={tx(pt.month)} y={h - 6} textAnchor="middle" className="fill-[#78716C] font-mono text-[10px]">
+                            M{pt.month}
+                          </text>
+                        ))}
+                        <path d={legPath} fill="none" stroke="#9A3412" strokeWidth={2.2} strokeDasharray="5 4" />
+                        <path d={tghmPath} fill="none" stroke="#1E3A8A" strokeWidth={2.5} />
+                      </svg>
+                      <p className="mt-2 font-serif text-xs italic text-[#57534E]">
+                        Figure 2 — 36-month technical debt accumulation comparing monolithic proprietary LCNC (dashed terracotta) against TGHM Open-IR Hybrid (solid blue, -{simOutput.debtReductionPct}% debt at Month 36).
+                      </p>
+                    </section>
+                  );
+                })()}
+
+                {/* Table 4A & 4B + Figure 3: Sensitivity & Elasticity Analysis */}
+                <section className="space-y-5">
+                  <div>
+                    <p className="font-serif text-xs italic text-[#57534E]">
+                      Table 4A — One-at-a-Time Throughput Sensitivity &amp; Elasticity Analysis (±15% Perturbation, Active Base = {simOutput.effectiveThroughputRps} req/s).
+                    </p>
+                    <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                            <th className="py-2 pr-3 font-semibold">Input Factor</th>
+                            <th className="py-2 pr-3 font-semibold text-right">-15%</th>
+                            <th className="py-2 pr-3 font-semibold text-right">+15%</th>
+                            <th className="py-2 font-semibold text-right">Swing &amp; Elasticity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#ECE8DF]">
+                          {sensitivity.factors.map((f) => (
+                            <tr key={f.id}>
+                              <td className="py-2 pr-3 font-medium text-[#1C1917]">
+                                {f.label} <span className="font-mono text-[11px] text-[#78716C]">({f.baselineDisplay})</span>
+                              </td>
+                              <td className="py-2 pr-3 text-right font-mono tabular-nums">{f.lowEffectiveRps} req/s</td>
+                              <td className="py-2 pr-3 text-right font-mono tabular-nums">{f.highEffectiveRps} req/s</td>
+                              <td className="py-2 text-right font-mono font-semibold text-[#1E3A8A] tabular-nums">
+                                {f.swingRps} req/s ({f.elasticityRatio.toFixed(2)}×)
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-serif text-xs italic text-[#57534E]">
+                      Table 4B — Cross-Baseline Dominant Throughput Sensitivity Driver (±15% Perturbation Across B1–B4).
+                    </p>
+                    <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                            <th className="py-2 pr-3 font-semibold">Baseline Case Study</th>
+                            <th className="py-2 pr-3 font-semibold">Dominant Driver</th>
+                            <th className="py-2 pr-3 font-semibold text-right">-15% to +15% Range</th>
+                            <th className="py-2 font-semibold text-right">Swing &amp; Elasticity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#ECE8DF]">
+                          {fourBaselines.map((b) => (
+                            <tr key={b.code}>
+                              <td className="py-2 pr-3 font-medium text-[#1C1917]">
+                                {b.code}: {b.preset.label}
+                              </td>
+                              <td className="py-2 pr-3 text-[#44403C]">{b.sensitivityTopFactor.label}</td>
+                              <td className="py-2 pr-3 text-right font-mono tabular-nums">
+                                {b.sensitivityTopFactor.lowEffectiveRps}–{b.sensitivityTopFactor.highEffectiveRps} req/s
+                              </td>
+                              <td className="py-2 text-right font-mono font-semibold text-[#1E3A8A] tabular-nums">
+                                {b.sensitivityTopFactor.swingRps} req/s ({b.sensitivityTopFactor.elasticityRatio.toFixed(2)}×)
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const pts = sensitivity.sweepPoints;
+                    const minX = pts[0].xValue;
+                    const maxX = pts[pts.length - 1].xValue;
+                    const maxY = Math.max(250, ...pts.map((p) => Math.max(p.tghmEffectiveRps, p.legacyEffectiveRps)));
+                    const w = 540;
+                    const h = 190;
+                    const pL = 44;
+                    const pR = 16;
+                    const pT = 18;
+                    const pB = 28;
+                    const plW = w - pL - pR;
+                    const plH = h - pT - pB;
+                    const sx = (x: number) => pL + ((x - minX) / Math.max(1, maxX - minX)) * plW;
+                    const sy = (y: number) => pT + plH - (y / maxY) * plH;
+                    const tPath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.xValue).toFixed(1)} ${sy(p.tghmEffectiveRps).toFixed(1)}`).join(' ');
+                    const lPath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.xValue).toFixed(1)} ${sy(p.legacyEffectiveRps).toFixed(1)}`).join(' ');
+                    return (
+                      <div className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-4">
+                        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" role="img" aria-label="Figure 3 Throughput Sensitivity Sweep">
+                          {[0, 0.5, 1].map((f) => {
+                            const y = pT + plH * (1 - f);
+                            return (
+                              <g key={f}>
+                                <line x1={pL} y1={y} x2={w - pR} y2={y} stroke="#DED9CE" strokeDasharray="3 3" />
+                                <text x={pL - 6} y={y + 4} textAnchor="end" className="fill-[#78716C] font-mono text-[10px]">
+                                  {Math.round(maxY * f)}
+                                </text>
+                              </g>
+                            );
+                          })}
+                          {sensitivity.regimeTransitions.map((tr) => (
+                            <line key={tr.xValue} x1={sx(tr.xValue)} y1={pT} x2={sx(tr.xValue)} y2={pT + plH} stroke="#14532D" strokeDasharray="4 3" />
+                          ))}
+                          {[0, 3, 6, 9, 12].map((idx) => {
+                            const pt = pts[idx];
+                            if (!pt) return null;
+                            return (
+                              <text key={pt.xValue} x={sx(pt.xValue)} y={h - 6} textAnchor="middle" className="fill-[#78716C] font-mono text-[10px]">
+                                {pt.xValue}
+                              </text>
+                            );
+                          })}
+                          <path d={lPath} fill="none" stroke="#9A3412" strokeWidth={2.2} strokeDasharray="5 4" />
+                          <path d={tPath} fill="none" stroke="#1E3A8A" strokeWidth={2.5} />
+                        </svg>
+                        <p className="mt-2 font-serif text-xs italic text-[#57534E]">
+                          Figure 3 — Delivered system throughput across incoming request volume (100–2,500 req/s): TGHM AMPO-ZT (solid blue) vs. monolithic legacy LCNC (dashed terracotta), with vertical dashed AMPO-ZT offload regime transitions.
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </section>
+
+                {/* Table 5: Tri-Strata Plane Synthesis (Plane I, Plane II & Plane III) */}
+                <section>
+                  <p className="font-serif text-xs italic text-[#57534E]">
+                    Table 5 — Tri-Strata Architectural Synthesis Across Plane I, Plane II, and Plane III (Modules, Datasets &amp; Verified Outcomes).
+                  </p>
+                  <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                          <th className="py-2 pr-3 font-semibold">TGHM Plane</th>
+                          <th className="py-2 pr-3 font-semibold">Modules &amp; Dataset Anchor</th>
+                          <th className="py-2 font-semibold">Mechanism &amp; Verified Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#ECE8DF]">
+                        {planeSummaries.map((p) => (
+                          <tr key={p.plane} className="align-top">
+                            <td className="py-2.5 pr-3">
+                              <div className="font-mono font-semibold text-[#1E3A8A]">{p.plane}</div>
+                              <div className="font-medium text-[#1C1917]">{p.planeName}</div>
+                            </td>
+                            <td className="py-2.5 pr-3 text-[#44403C]">
+                              <div>{p.modules}</div>
+                              <div className="mt-1 font-mono text-[11px] text-[#78716C]">{p.datasetAnchor}</div>
+                            </td>
+                            <td className="py-2.5 text-[#44403C]">
+                              <div>{p.keyMechanism}</div>
+                              <div className="mt-1 font-mono text-[11px] text-[#14532D]">{p.verifiedMetric}</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                {/* Table 6 & Figure 5: Three-Way Paradigm Comparison */}
+                <section className="space-y-4">
+                  <div>
+                    <p className="font-serif text-xs italic text-[#57534E]">
+                      Table 6 — Three-Way Engineering Paradigm Comparison: Monolithic Legacy LCNC vs. Manual Pro-Code vs. TGHM Tri-Strata.
+                    </p>
+                    <div className="mt-2 overflow-x-auto border-y border-[#DED9CE]">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#DED9CE] text-[#57534E]">
+                            <th className="py-2 pr-3 font-semibold">Evaluation Dimension</th>
+                            <th className="py-2 pr-3 font-semibold">Monolithic Legacy LCNC</th>
+                            <th className="py-2 pr-3 font-semibold">Manual Pro-Code</th>
+                            <th className="py-2 font-semibold text-[#1E3A8A]">TGHM Tri-Strata (Ours)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#ECE8DF]">
+                          {paradigmRows.map((r) => (
+                            <tr key={r.dimension}>
+                              <td className="py-2 pr-3 font-medium text-[#1C1917]">{r.dimension}</td>
+                              <td className="py-2 pr-3 text-[#9A3412]">{r.monolithicDisplay}</td>
+                              <td className="py-2 pr-3 text-[#44403C]">{r.manualProCodeDisplay}</td>
+                              <td className="py-2 font-semibold text-[#1E3A8A]">{r.tghmDisplay}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const w = 540;
+                    const h = 205;
+                    const pL = 42;
+                    const pR = 16;
+                    const pT = 22;
+                    const pB = 42;
+                    const plW = w - pL - pR;
+                    const plH = h - pT - pB;
+                    const groupW = plW / paradigmRows.length;
+                    const barW = 16;
+                    const gap = 4;
+
+                    return (
+                      <div className="rounded-md border border-[#DED9CE] bg-[#FAF9F6] p-4">
+                        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" role="img" aria-label="Figure 5 Three-Way Paradigm Comparison">
+                          {[0, 50, 100].map((pct) => {
+                            const y = pT + plH * (1 - pct / 100);
+                            return (
+                              <g key={pct}>
+                                <line x1={pL} y1={y} x2={w - pR} y2={y} stroke="#DED9CE" strokeDasharray="3 3" />
+                                <text x={pL - 6} y={y + 4} textAnchor="end" className="fill-[#78716C] font-mono text-[10px]">
+                                  {pct}%
+                                </text>
+                              </g>
+                            );
+                          })}
+                          {paradigmRows.map((r, idx) => {
+                            const cx = pL + idx * groupW + groupW / 2;
+                            const h1 = (r.monolithicLcncScore / 100) * plH;
+                            const h2 = (r.manualProCodeScore / 100) * plH;
+                            const h3 = (r.tghmScore / 100) * plH;
+                            const x1 = cx - barW * 1.5 - gap;
+                            const x2 = cx - barW * 0.5;
+                            const x3 = cx + barW * 0.5 + gap;
+                            return (
+                              <g key={r.dimension}>
+                                <rect x={x1} y={pT + plH - h1} width={barW} height={h1} fill="#9A3412" />
+                                <rect x={x2} y={pT + plH - h2} width={barW} height={h2} fill="#64748B" />
+                                <rect x={x3} y={pT + plH - h3} width={barW} height={h3} fill="#1E3A8A" />
+                                <text x={x3 + barW / 2} y={pT + plH - h3 - 4} textAnchor="middle" className="fill-[#1E3A8A] font-mono text-[9px] font-semibold">
+                                  {r.tghmScore}
+                                </text>
+                                <text x={cx} y={h - pB + 16} textAnchor="middle" className="fill-[#1C1917] text-[9px] font-semibold">
+                                  {r.dimension}
+                                </text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                        <p className="mt-2 font-serif text-xs italic text-[#57534E]">
+                          Figure 5 — Normalized (0–100) three-way paradigm comparison contrasting Monolithic Legacy LCNC (terracotta), Manual Pro-Code (slate gray), and TGHM Tri-Strata Planes I–III (blue).
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </section>
 
                 {/* References */}
                 <section className="border-t border-[#DED9CE] pt-6">
@@ -414,8 +1051,18 @@ export const ManuscriptStudio: React.FC<ManuscriptStudioProps> = ({
             <div className="space-y-2 pt-1">
               <button
                 type="button"
+                onClick={handleDownloadWord}
+                disabled={isExportingWord}
+                className="w-full flex items-center justify-between rounded-md bg-[#1E3A8A] px-3.5 py-2.5 text-xs font-semibold text-white hover:bg-[#172554] disabled:opacity-60"
+              >
+                <span>{isExportingWord ? 'Building Word Document...' : 'Download Word Document (.docx)'}</span>
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleDownload('tghm_updated_paper.tex', latexSource)}
-                className="w-full flex items-center justify-between rounded-md bg-[#1E3A8A] px-3.5 py-2.5 text-xs font-semibold text-white hover:bg-[#172554]"
+                className="w-full flex items-center justify-between rounded-md border border-[#CFC8B8] bg-[#FAF9F6] px-3.5 py-2.5 text-xs font-semibold text-[#1C1917] hover:bg-[#EFECE4]"
               >
                 <span>Download LaTeX Manuscript (.tex)</span>
                 <Download className="h-3.5 w-3.5" aria-hidden="true" />
